@@ -40,29 +40,25 @@
 #include "smsdk_ext.h"
 
 #include <sourcehook.h>
-#include <sourcehook_pibuilder.h>
 
 using namespace SourceHook;
-
-class ExtinguishDelegate :
-	public ISHDelegate
-{
-	// don't really know what's up here, but returning false looks like causes memory leak
-	virtual bool IsEqual(ISHDelegate *pOtherDeleg) {
-		return *reinterpret_cast<void**>(this) == *reinterpret_cast<void**>(pOtherDeleg);
-	}
-	virtual void DeleteThis() {}
-	virtual void Extinguish();
-};
 
 /**
  * @brief Sample implementation of the SDK Extension.
  * Note: Uncomment one of the pre-defined virtual functions in order to use it.
  */
-class ExtinguishFix :
+class ExtinguishFixExt :
 	public SDKExtension,
 	public IClientListener
 {
+public:
+	ExtinguishFixExt() {
+		hook_id = 0;
+	}
+
+	void Extinguish();
+private:
+	int hook_id;
 public:
 	/**
 	 * @brief This is called after the initial loading sequence has been processed.
@@ -83,7 +79,7 @@ public:
 	 * @brief This is called once all known extensions have been loaded.
 	 * Note: It is is a good idea to add natives here, if any are provided.
 	 */
-	virtual void SDK_OnAllLoaded();
+	//virtual void SDK_OnAllLoaded();
 
 	/**
 	 * @brief Called when the pause state is changed.
@@ -97,7 +93,7 @@ public:
 	 * @param maxlength	Size of error message buffer.
 	 * @return			True if working, false otherwise.
 	 */
-	virtual bool QueryRunning(char *error, size_t maxlength);
+	//virtual bool QueryRunning(char *error, size_t maxlength);
 public:
 #if defined SMEXT_CONF_METAMOD
 	/**
@@ -108,7 +104,7 @@ public:
 	 * @param late			Whether or not Metamod considers this a late load.
 	 * @return				True to succeed, false to fail.
 	 */
-	virtual bool SDK_OnMetamodLoad(ISmmAPI *ismm, char *error, size_t maxlength, bool late);
+	//virtual bool SDK_OnMetamodLoad(ISmmAPI *ismm, char *error, size_t maxlength, bool late);
 
 	/**
 	 * @brief Called when Metamod is detaching, after the extension version is called.
@@ -150,9 +146,6 @@ public:
 	* @brief Called when the server is activated.
 	*/
 	virtual void OnServerActivated(int max_clients);
-private:
-	HookManagerPubFunc hookMgrIFace;
-	ExtinguishDelegate handler;
 };
 
 #endif // _INCLUDE_SOURCEMOD_EXTENSION_PROPER_H_

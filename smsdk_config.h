@@ -39,8 +39,8 @@
 
 /* Basic information exposed publicly */
 #define SMEXT_CONF_NAME			"[L4D2] CTerrorPlayer::Extinguish fix"
-#define SMEXT_CONF_DESCRIPTION	"Fixes incorrect game behaviour whenever player gets extinguished"
-#define SMEXT_CONF_VERSION		"1.0.0.0"
+#define SMEXT_CONF_DESCRIPTION	"Fixes incorrect game behaviour whenever CTerrorPlayer gets extinguished"
+#define SMEXT_CONF_VERSION		"1.0.0.1"
 #define SMEXT_CONF_AUTHOR		"shqke"
 #define SMEXT_CONF_URL			"https://github.com/shqke/l4d2_extinguish_fix"
 #define SMEXT_CONF_LOGTAG		"L4D2-EXTINGUISHFIX"

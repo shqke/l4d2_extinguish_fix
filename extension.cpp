@@ -36,24 +36,23 @@
  * @brief Implement extension code here.
  */
 
-ExtinguishFix g_ExtinguishFix;		/**< Global singleton for extension's main interface */
+ExtinguishFixExt g_ExtinguishFixExt;		/**< Global singleton for extension's main interface */
 
-SMEXT_LINK(&g_ExtinguishFix);
+SMEXT_LINK(&g_ExtinguishFixExt);
 
 using namespace SourceHook;
 
-IHookManagerAutoGen *g_HookMgr = NULL;
+SH_DECL_MANUALHOOK0_void(ExtinguishHook, 0, 0, 0);
 
 int m_hEffectEntity = -1;
 int m_nWaterLevel = -1;
 int m_fFlags = -1;
 int m_hEntAttached = -1;
-short max_players = 0;
+int max_players = 0;
 
-bool ExtinguishFix::SDK_OnLoad(char *error, size_t maxlength, bool late)
+bool ExtinguishFixExt::SDK_OnLoad(char *error, size_t maxlength, bool late)
 {
 	sm_sendprop_info_t info;
-	CProtoInfoBuilder protoInfo(ProtoInfo::CallConv_ThisCall);
 	int offset;
 	bool success = false;
 	IGameConfig *gc;
@@ -73,70 +72,59 @@ bool ExtinguishFix::SDK_OnLoad(char *error, size_t maxlength, bool late)
 	gameconfs->CloseGameConfigFile(gc);
 	if (!success) return false;
 
-	hookMgrIFace = g_HookMgr->MakeHookMan(protoInfo, 0, offset);
+	SH_MANUALHOOK_RECONFIGURE(ExtinguishHook, offset, 0, 0);
 
-	sharesys->AddDependency(myself, "bintools.ext", true, true);
 	playerhelpers->AddClientListener(this);
 
-	if (late && playerhelpers->IsServerActivated()) OnServerActivated(playerhelpers->GetMaxClients());
+	if (late && playerhelpers->IsServerActivated()) {
+		OnServerActivated(playerhelpers->GetMaxClients());
+
+		for (int i = max_players; i > 0; i--) {
+			if (playerhelpers->GetGamePlayer(i)->IsInGame()) {
+				OnClientPutInServer(i);
+			}
+		}
+	}
 
 	return true;
 }
 
-void ExtinguishFix::SDK_OnUnload()
-{
-	playerhelpers->RemoveClientListener(this);
-
-	if (hookMgrIFace) g_HookMgr->ReleaseHookMan(hookMgrIFace);
-}
-
-void ExtinguishFix::SDK_OnAllLoaded()
+void ExtinguishFixExt::SDK_OnUnload()
 {
 	for (int i = max_players; i > 0; i--) {
 		if (playerhelpers->GetGamePlayer(i)->IsInGame()) {
-			OnClientPutInServer(i);
+			OnClientDisconnected(i);
 		}
 	}
+
+	playerhelpers->RemoveClientListener(this);
 }
 
-bool ExtinguishFix::QueryRunning(char *error, size_t maxlength)
+void ExtinguishFixExt::OnClientPutInServer(int client)
 {
-	return true;
+	SH_ADD_MANUALHOOK(ExtinguishHook, gamehelpers->ReferenceToEntity(client), SH_MEMBER(this, &ExtinguishFixExt::Extinguish), false);
 }
 
-bool ExtinguishFix::SDK_OnMetamodLoad(ISmmAPI *ismm, char *error, size_t maxlen, bool late)
+void ExtinguishFixExt::OnClientDisconnected(int client)
 {
-	g_HookMgr = static_cast<IHookManagerAutoGen *>(ismm->MetaFactory(MMIFACE_SH_HOOKMANAUTOGEN, NULL, NULL));
-
-	return g_HookMgr != NULL;
+	SH_REMOVE_MANUALHOOK(ExtinguishHook, gamehelpers->ReferenceToEntity(client), SH_MEMBER(this, &ExtinguishFixExt::Extinguish), false);
 }
 
-void ExtinguishFix::OnClientPutInServer(int client)
-{
-	g_SHPtr->AddHook(g_PLID, ISourceHook::Hook_Normal, gamehelpers->ReferenceToEntity(client), 0, hookMgrIFace, &handler, false);
-}
-
-void ExtinguishFix::OnClientDisconnected(int client)
-{
-	g_SHPtr->RemoveHook(g_PLID, gamehelpers->ReferenceToEntity(client), 0, hookMgrIFace, &handler, false);
-}
-
-void ExtinguishFix::OnServerActivated(int max_clients)
+void ExtinguishFixExt::OnServerActivated(int max_clients)
 {
 	max_players = max_clients;
 }
 
-void ExtinguishDelegate::Extinguish()
+void ExtinguishFixExt::Extinguish()
 {
 	CBaseEntity *pClient = META_IFACEPTR(CBaseEntity);
-
 	int& entFlags = *(int *)((char *)pClient + m_fFlags);
-	int& efxEntity = *(int *)((char *)pClient + m_hEffectEntity);
+	CBaseHandle *efxEntity = ((CBaseHandle *)((char *)pClient + m_hEffectEntity));
 	int level = *(char *)((char *)pClient + m_nWaterLevel);
 
 	if (entFlags & FL_ONFIRE && !level && efxEntity) {
 		edict_t *edictClient = gamehelpers->EdictOfIndex(gamehelpers->EntityToBCompatRef(pClient));
-		edict_t *edictEfxEntity = gamehelpers->GetHandleEntity(*(CBaseHandle *)efxEntity);
+		edict_t *edictEfxEntity = gamehelpers->GetHandleEntity(*efxEntity);
 		const char *name;
 
 		entFlags &= ~FL_ONFIRE;
@@ -146,7 +134,7 @@ void ExtinguishDelegate::Extinguish()
 			*(int *)((char *)efxEntity + m_hEntAttached) = 0;
 		}
 
-		efxEntity = 0;
+		*efxEntity = NULL;
 		gamehelpers->SetEdictStateChanged(edictClient, m_hEffectEntity);
 
 		RETURN_META(MRES_SUPERCEDE);
